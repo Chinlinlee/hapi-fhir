@@ -1355,7 +1355,25 @@ public class TermReadSvcImpl implements ITermReadSvc, IHasScheduledJobs {
 	 */
 	private PredicateFinalStep buildExpansionPredicate(List<String> theCodes, SearchPredicateFactory thePredicate) {
 		assert !theCodes.isEmpty();
-		return thePredicate.simpleQueryString().field("myCode").matching(String.join(" | ", theCodes));
+
+		List<String> escapedCodes;
+		if (myHibernatePropertiesProvider.getHibernateSearchBackend().equalsIgnoreCase("lucene")) {
+			escapedCodes = theCodes.stream().map(this::escapeLucene).collect(Collectors.toList());
+		} else if (myHibernatePropertiesProvider.getHibernateSearchBackend().equalsIgnoreCase("elasticsearch")) {
+			escapedCodes = theCodes.stream().map(this::escapeElasticsearch).collect(Collectors.toList());
+		} else {
+			escapedCodes = theCodes;
+		}
+
+		return thePredicate.simpleQueryString().field("myCode").matching(String.join(" | ", escapedCodes));
+	}
+
+	private String escapeLucene(String code) {
+		return code.replaceAll("([+\\-&|!(){}^\"~*?:\\\\])", "\\\\$1");
+	}
+
+	private String escapeElasticsearch(String code) {
+		return code.replaceAll("([+\\-|\"*()~])", "\\\\\\\\$1");
 	}
 
 	private String buildCodeSystemUrlAndVersion(String theSystem, String theIncludeOrExcludeVersion) {
