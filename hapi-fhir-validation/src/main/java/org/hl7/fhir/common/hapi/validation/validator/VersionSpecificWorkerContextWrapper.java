@@ -58,7 +58,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -69,6 +71,7 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 	private final VersionCanonicalizer myVersionCanonicalizer;
 	private final LoadingCache<ResourceKey, IBaseResource> myFetchResourceCache;
 	private volatile List<StructureDefinition> myAllStructures;
+	private volatile Set<String> myAllPrimitiveTypes;
 	private Parameters myExpansionProfile;
 
 	public VersionSpecificWorkerContextWrapper(
@@ -617,11 +620,23 @@ public class VersionSpecificWorkerContextWrapper extends I18nBase implements IWo
 
 	@Override
 	public boolean isPrimitiveType(String theType) {
-		List<StructureDefinition> allStructures = new ArrayList<>(allStructures());
-		return allStructures.stream()
-				.filter(structureDefinition ->
-						structureDefinition.getKind() == StructureDefinition.StructureDefinitionKind.PRIMITIVETYPE)
-				.anyMatch(structureDefinition -> theType.equals(structureDefinition.getName()));
+		return allPrimitiveTypes().contains(theType);
+	}
+
+	private Set<String> allPrimitiveTypes() {
+		Set<String> retVal = myAllPrimitiveTypes;
+		if (retVal == null) {
+			retVal = allStructures().stream()
+					.filter(structureDefinition ->
+							structureDefinition.getKind() == StructureDefinition.StructureDefinitionKind.PRIMITIVETYPE)
+					.map(StructureDefinition::getName)
+					.filter(Objects::nonNull)
+					.distinct()
+					.collect(Collectors.toUnmodifiableSet());
+			myAllPrimitiveTypes = retVal;
+		}
+
+		return retVal;
 	}
 
 	@Override
